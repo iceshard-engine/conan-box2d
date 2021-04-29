@@ -1,0 +1,40 @@
+name: Validate
+
+on: 'push'
+
+jobs:
+
+  validation-build-ubuntu:
+    name: Validate (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup conan
+      run: |
+        pip3 install setuptools
+        pip3 install conan
+        ~/.local/bin/conan config install https://github.com/iceshard-engine/conan-config.git
+    - name: Export
+      run: |
+        ~/.local/bin/conan create . box2d/2.4.1@iceshard/stable --profile clang-9.0-linux-x86_64
+        ~/.local/bin/conan create . box2d/2.4.1@iceshard/stable --profile clang-9.0-linux-x86_64 -o"custom_allocator_extension=True"
+    - name: Success
+      run: |
+        echo 'Validation success'
+  validation-build-windows:
+    name: Validate (Windows)
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup conan
+      run: |
+        pip3 install setuptools
+        pip3 install conan
+        conan config install https://github.com/iceshard-engine/conan-config.git
+    - name: Export
+      run: |
+        conan create . box2d/2.4.1@iceshard/stable
+        conan create . box2d/2.4.1@iceshard/stable -o"custom_allocator_extension=True"
+    - name: Success
+      run: |
+        echo 'Validation success'
