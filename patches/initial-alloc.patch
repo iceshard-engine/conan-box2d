@@ -1,0 +1,749 @@
+﻿diff --git a/include/box2d/b2_block_allocator.h b/include/box2d/b2_block_allocator.h
+index 95c12de..1709d35 100644
+--- a/include/box2d/b2_block_allocator.h
++++ b/include/box2d/b2_block_allocator.h
+@@ -37,7 +37,7 @@ struct b2Chunk;
+ class B2_API b2BlockAllocator
+ {
+ public:
+-	b2BlockAllocator();
++	b2BlockAllocator(void* allocator_userdata);
+ 	~b2BlockAllocator();
+ 
+ 	/// Allocate memory. This will use b2Alloc if the size is larger than b2_maxBlockSize.
+@@ -49,7 +49,7 @@ public:
+ 	void Clear();
+ 
+ private:
+-
++	void* m_userdata;
+ 	b2Chunk* m_chunks;
+ 	int32 m_chunkCount;
+ 	int32 m_chunkSpace;
+diff --git a/include/box2d/b2_broad_phase.h b/include/box2d/b2_broad_phase.h
+index cc882ab..3d1c0bc 100644
+--- a/include/box2d/b2_broad_phase.h
++++ b/include/box2d/b2_broad_phase.h
+@@ -46,7 +46,7 @@ public:
+ 		e_nullProxy = -1
+ 	};
+ 
+-	b2BroadPhase();
++	b2BroadPhase(void* alloc_userdata);
+ 	~b2BroadPhase();
+ 
+ 	/// Create a proxy with an initial AABB. Pairs are not reported until
+@@ -117,6 +117,8 @@ private:
+ 
+ 	bool QueryCallback(int32 proxyId);
+ 
++	void* m_userdata;
++
+ 	b2DynamicTree m_tree;
+ 
+ 	int32 m_proxyCount;
+diff --git a/include/box2d/b2_chain_shape.h b/include/box2d/b2_chain_shape.h
+index da2605d..20f4361 100644
+--- a/include/box2d/b2_chain_shape.h
++++ b/include/box2d/b2_chain_shape.h
+@@ -36,7 +36,7 @@ class b2EdgeShape;
+ class B2_API b2ChainShape : public b2Shape
+ {
+ public:
+-	b2ChainShape();
++	b2ChainShape(void* alloc_userdata);
+ 
+ 	/// The destructor frees the vertices using b2Free.
+ 	~b2ChainShape();
+@@ -81,6 +81,8 @@ public:
+ 	/// @see b2Shape::ComputeMass
+ 	void ComputeMass(b2MassData* massData, float density) const override;
+ 
++	void* m_userdata;
++
+ 	/// The vertices. Owned by this class.
+ 	b2Vec2* m_vertices;
+ 
+@@ -90,8 +92,9 @@ public:
+ 	b2Vec2 m_prevVertex, m_nextVertex;
+ };
+ 
+-inline b2ChainShape::b2ChainShape()
++inline b2ChainShape::b2ChainShape(void* alloc_userdata)
+ {
++	m_userdata = alloc_userdata;
+ 	m_type = e_chain;
+ 	m_radius = b2_polygonRadius;
+ 	m_vertices = nullptr;
+diff --git a/include/box2d/b2_contact_manager.h b/include/box2d/b2_contact_manager.h
+index fbd3b4d..46a0b9b 100644
+--- a/include/box2d/b2_contact_manager.h
++++ b/include/box2d/b2_contact_manager.h
+@@ -35,7 +35,7 @@ class b2BlockAllocator;
+ class B2_API b2ContactManager
+ {
+ public:
+-	b2ContactManager();
++	b2ContactManager(void* alloc_userdata);
+ 
+ 	// Broad-phase callback.
+ 	void AddPair(void* proxyUserDataA, void* proxyUserDataB);
+diff --git a/include/box2d/b2_dynamic_tree.h b/include/box2d/b2_dynamic_tree.h
+index b854919..9e12153 100644
+--- a/include/box2d/b2_dynamic_tree.h
++++ b/include/box2d/b2_dynamic_tree.h
+@@ -69,7 +69,7 @@ class B2_API b2DynamicTree
+ {
+ public:
+ 	/// Constructing the tree initializes the node pool.
+-	b2DynamicTree();
++	b2DynamicTree(void* alloc_userdata);
+ 
+ 	/// Destroy the tree, freeing the node pool.
+ 	~b2DynamicTree();
+@@ -134,7 +134,6 @@ public:
+ 	void ShiftOrigin(const b2Vec2& newOrigin);
+ 
+ private:
+-
+ 	int32 AllocateNode();
+ 	void FreeNode(int32 node);
+ 
+@@ -149,6 +148,8 @@ private:
+ 	void ValidateStructure(int32 index) const;
+ 	void ValidateMetrics(int32 index) const;
+ 
++	void* m_userdata;
++
+ 	int32 m_root;
+ 
+ 	b2TreeNode* m_nodes;
+@@ -187,7 +188,7 @@ inline const b2AABB& b2DynamicTree::GetFatAABB(int32 proxyId) const
+ template <typename T>
+ inline void b2DynamicTree::Query(T* callback, const b2AABB& aabb) const
+ {
+-	b2GrowableStack<int32, 256> stack;
++	b2GrowableStack<int32, 256> stack{ m_userdata };
+ 	stack.Push(m_root);
+ 
+ 	while (stack.GetCount() > 0)
+@@ -245,7 +246,7 @@ inline void b2DynamicTree::RayCast(T* callback, const b2RayCastInput& input) con
+ 		segmentAABB.upperBound = b2Max(p1, t);
+ 	}
+ 
+-	b2GrowableStack<int32, 256> stack;
++	b2GrowableStack<int32, 256> stack{ m_userdata };
+ 	stack.Push(m_root);
+ 
+ 	while (stack.GetCount() > 0)
+diff --git a/include/box2d/b2_growable_stack.h b/include/box2d/b2_growable_stack.h
+index ec42e5e..38887ac 100644
+--- a/include/box2d/b2_growable_stack.h
++++ b/include/box2d/b2_growable_stack.h
+@@ -34,8 +34,9 @@ template <typename T, int32 N>
+ class b2GrowableStack
+ {
+ public:
+-	b2GrowableStack()
++	b2GrowableStack(void* userdata)
+ 	{
++		m_userdata = userdata;
+ 		m_stack = m_array;
+ 		m_count = 0;
+ 		m_capacity = N;
+@@ -45,7 +46,7 @@ public:
+ 	{
+ 		if (m_stack != m_array)
+ 		{
+-			b2Free(m_stack);
++			b2Free(m_userdata, m_stack);
+ 			m_stack = nullptr;
+ 		}
+ 	}
+@@ -56,11 +57,11 @@ public:
+ 		{
+ 			T* old = m_stack;
+ 			m_capacity *= 2;
+-			m_stack = (T*)b2Alloc(m_capacity * sizeof(T));
++			m_stack = (T*)b2Alloc(m_userdata, m_capacity * sizeof(T));
+ 			memcpy(m_stack, old, m_count * sizeof(T));
+ 			if (old != m_array)
+ 			{
+-				b2Free(old);
++				b2Free(m_userdata, old);
+ 			}
+ 		}
+ 
+@@ -81,6 +82,7 @@ public:
+ 	}
+ 
+ private:
++	void* m_userdata;
+ 	T* m_stack;
+ 	T m_array[N];
+ 	int32 m_count;
+diff --git a/include/box2d/b2_rope.h b/include/box2d/b2_rope.h
+index 47f5fc4..4373d17 100644
+--- a/include/box2d/b2_rope.h
++++ b/include/box2d/b2_rope.h
+@@ -101,7 +101,7 @@ struct B2_API b2RopeDef
+ class B2_API b2Rope
+ {
+ public:
+-	b2Rope();
++	b2Rope(void* alloc_userdata);
+ 	~b2Rope();
+ 
+ 	///
+@@ -130,6 +130,7 @@ private:
+ 	void SolveBend_PBD_Triangle();
+ 	void ApplyBendForces(float dt);
+ 
++	void* m_userdata;
+ 	b2Vec2 m_position;
+ 
+ 	int32 m_count;
+diff --git a/include/box2d/b2_settings.h b/include/box2d/b2_settings.h
+index 48cd95d..854d618 100644
+--- a/include/box2d/b2_settings.h
++++ b/include/box2d/b2_settings.h
+@@ -97,13 +97,13 @@ B2_API void* b2Alloc_Default(int32 size);
+ B2_API void b2Free_Default(void* mem);
+ 
+ /// Implement this function to use your own memory allocator.
+-inline void* b2Alloc(int32 size)
++inline void* b2Alloc(void*, int32 size)
+ {
+ 	return b2Alloc_Default(size);
+ }
+ 
+ /// If you implement b2Alloc, you should also implement this function.
+-inline void b2Free(void* mem)
++inline void b2Free(void*, void* mem)
+ {
+ 	b2Free_Default(mem);
+ }
+diff --git a/include/box2d/b2_stack_allocator.h b/include/box2d/b2_stack_allocator.h
+index 1db2af5..fa66e9e 100644
+--- a/include/box2d/b2_stack_allocator.h
++++ b/include/box2d/b2_stack_allocator.h
+@@ -42,7 +42,7 @@ struct B2_API b2StackEntry
+ class B2_API b2StackAllocator
+ {
+ public:
+-	b2StackAllocator();
++	b2StackAllocator(void* alloc_userdata);
+ 	~b2StackAllocator();
+ 
+ 	void* Allocate(int32 size);
+@@ -51,7 +51,7 @@ public:
+ 	int32 GetMaxAllocation() const;
+ 
+ private:
+-
++	void* m_userdata;
+ 	char m_data[b2_stackSize];
+ 	int32 m_index;
+ 
+diff --git a/include/box2d/b2_world.h b/include/box2d/b2_world.h
+index 57d3709..e1680c1 100644
+--- a/include/box2d/b2_world.h
++++ b/include/box2d/b2_world.h
+@@ -48,7 +48,7 @@ class B2_API b2World
+ public:
+ 	/// Construct a world object.
+ 	/// @param gravity the world gravity vector.
+-	b2World(const b2Vec2& gravity);
++	b2World(const b2Vec2& gravity, void* alloc_userdata = nullptr);
+ 
+ 	/// Destruct the world. All physics entities are destroyed and all heap memory is released.
+ 	~b2World();
+diff --git a/src/collision/b2_broad_phase.cpp b/src/collision/b2_broad_phase.cpp
+index d063a3a..78b732f 100644
+--- a/src/collision/b2_broad_phase.cpp
++++ b/src/collision/b2_broad_phase.cpp
+@@ -23,23 +23,25 @@
+ #include "box2d/b2_broad_phase.h"
+ #include <string.h>
+ 
+-b2BroadPhase::b2BroadPhase()
++b2BroadPhase::b2BroadPhase(void* alloc_userdata)
++	: m_tree{ alloc_userdata }
+ {
++	m_userdata = alloc_userdata;
+ 	m_proxyCount = 0;
+ 
+ 	m_pairCapacity = 16;
+ 	m_pairCount = 0;
+-	m_pairBuffer = (b2Pair*)b2Alloc(m_pairCapacity * sizeof(b2Pair));
++	m_pairBuffer = (b2Pair*)b2Alloc(m_userdata, m_pairCapacity * sizeof(b2Pair));
+ 
+ 	m_moveCapacity = 16;
+ 	m_moveCount = 0;
+-	m_moveBuffer = (int32*)b2Alloc(m_moveCapacity * sizeof(int32));
++	m_moveBuffer = (int32*)b2Alloc(m_userdata, m_moveCapacity * sizeof(int32));
+ }
+ 
+ b2BroadPhase::~b2BroadPhase()
+ {
+-	b2Free(m_moveBuffer);
+-	b2Free(m_pairBuffer);
++	b2Free(m_userdata, m_moveBuffer);
++	b2Free(m_userdata, m_pairBuffer);
+ }
+ 
+ int32 b2BroadPhase::CreateProxy(const b2AABB& aabb, void* userData)
+@@ -77,9 +79,9 @@ void b2BroadPhase::BufferMove(int32 proxyId)
+ 	{
+ 		int32* oldBuffer = m_moveBuffer;
+ 		m_moveCapacity *= 2;
+-		m_moveBuffer = (int32*)b2Alloc(m_moveCapacity * sizeof(int32));
++		m_moveBuffer = (int32*)b2Alloc(m_userdata, m_moveCapacity * sizeof(int32));
+ 		memcpy(m_moveBuffer, oldBuffer, m_moveCount * sizeof(int32));
+-		b2Free(oldBuffer);
++		b2Free(m_userdata, oldBuffer);
+ 	}
+ 
+ 	m_moveBuffer[m_moveCount] = proxyId;
+@@ -118,9 +120,9 @@ bool b2BroadPhase::QueryCallback(int32 proxyId)
+ 	{
+ 		b2Pair* oldBuffer = m_pairBuffer;
+ 		m_pairCapacity = m_pairCapacity + (m_pairCapacity >> 1);
+-		m_pairBuffer = (b2Pair*)b2Alloc(m_pairCapacity * sizeof(b2Pair));
++		m_pairBuffer = (b2Pair*)b2Alloc(m_userdata, m_pairCapacity * sizeof(b2Pair));
+ 		memcpy(m_pairBuffer, oldBuffer, m_pairCount * sizeof(b2Pair));
+-		b2Free(oldBuffer);
++		b2Free(m_userdata, oldBuffer);
+ 	}
+ 
+ 	m_pairBuffer[m_pairCount].proxyIdA = b2Min(proxyId, m_queryProxyId);
+diff --git a/src/collision/b2_chain_shape.cpp b/src/collision/b2_chain_shape.cpp
+index b964a43..0103d64 100644
+--- a/src/collision/b2_chain_shape.cpp
++++ b/src/collision/b2_chain_shape.cpp
+@@ -35,7 +35,7 @@ b2ChainShape::~b2ChainShape()
+ 
+ void b2ChainShape::Clear()
+ {
+-	b2Free(m_vertices);
++	b2Free(m_userdata, m_vertices);
+ 	m_vertices = nullptr;
+ 	m_count = 0;
+ }
+@@ -58,7 +58,7 @@ void b2ChainShape::CreateLoop(const b2Vec2* vertices, int32 count)
+ 	}
+ 
+ 	m_count = count + 1;
+-	m_vertices = (b2Vec2*)b2Alloc(m_count * sizeof(b2Vec2));
++	m_vertices = (b2Vec2*)b2Alloc(m_userdata, m_count * sizeof(b2Vec2));
+ 	memcpy(m_vertices, vertices, count * sizeof(b2Vec2));
+ 	m_vertices[count] = m_vertices[0];
+ 	m_prevVertex = m_vertices[m_count - 2];
+@@ -76,7 +76,7 @@ void b2ChainShape::CreateChain(const b2Vec2* vertices, int32 count,	const b2Vec2
+ 	}
+ 
+ 	m_count = count;
+-	m_vertices = (b2Vec2*)b2Alloc(count * sizeof(b2Vec2));
++	m_vertices = (b2Vec2*)b2Alloc(m_userdata, count * sizeof(b2Vec2));
+ 	memcpy(m_vertices, vertices, m_count * sizeof(b2Vec2));
+ 
+ 	m_prevVertex = prevVertex;
+@@ -86,7 +86,7 @@ void b2ChainShape::CreateChain(const b2Vec2* vertices, int32 count,	const b2Vec2
+ b2Shape* b2ChainShape::Clone(b2BlockAllocator* allocator) const
+ {
+ 	void* mem = allocator->Allocate(sizeof(b2ChainShape));
+-	b2ChainShape* clone = new (mem) b2ChainShape;
++	b2ChainShape* clone = new (mem) b2ChainShape{ m_userdata };
+ 	clone->CreateChain(m_vertices, m_count, m_prevVertex, m_nextVertex);
+ 	return clone;
+ }
+diff --git a/src/collision/b2_dynamic_tree.cpp b/src/collision/b2_dynamic_tree.cpp
+index 55a9d32..75f89ad 100644
+--- a/src/collision/b2_dynamic_tree.cpp
++++ b/src/collision/b2_dynamic_tree.cpp
+@@ -22,13 +22,14 @@
+ #include "box2d/b2_dynamic_tree.h"
+ #include <string.h>
+ 
+-b2DynamicTree::b2DynamicTree()
++b2DynamicTree::b2DynamicTree(void* alloc_userdata)
+ {
++	m_userdata = alloc_userdata;
+ 	m_root = b2_nullNode;
+ 
+ 	m_nodeCapacity = 16;
+ 	m_nodeCount = 0;
+-	m_nodes = (b2TreeNode*)b2Alloc(m_nodeCapacity * sizeof(b2TreeNode));
++	m_nodes = (b2TreeNode*)b2Alloc(m_userdata, m_nodeCapacity * sizeof(b2TreeNode));
+ 	memset(m_nodes, 0, m_nodeCapacity * sizeof(b2TreeNode));
+ 
+ 	// Build a linked list for the free list.
+@@ -47,7 +48,7 @@ b2DynamicTree::b2DynamicTree()
+ b2DynamicTree::~b2DynamicTree()
+ {
+ 	// This frees the entire tree in one shot.
+-	b2Free(m_nodes);
++	b2Free(m_userdata, m_nodes);
+ }
+ 
+ // Allocate a node from the pool. Grow the pool if necessary.
+@@ -61,9 +62,9 @@ int32 b2DynamicTree::AllocateNode()
+ 		// The free list is empty. Rebuild a bigger pool.
+ 		b2TreeNode* oldNodes = m_nodes;
+ 		m_nodeCapacity *= 2;
+-		m_nodes = (b2TreeNode*)b2Alloc(m_nodeCapacity * sizeof(b2TreeNode));
++		m_nodes = (b2TreeNode*)b2Alloc(m_userdata, m_nodeCapacity * sizeof(b2TreeNode));
+ 		memcpy(m_nodes, oldNodes, m_nodeCount * sizeof(b2TreeNode));
+-		b2Free(oldNodes);
++		b2Free(m_userdata, oldNodes);
+ 
+ 		// Build a linked list for the free list. The parent
+ 		// pointer becomes the "next" pointer.
+@@ -716,7 +717,7 @@ int32 b2DynamicTree::GetMaxBalance() const
+ 
+ void b2DynamicTree::RebuildBottomUp()
+ {
+-	int32* nodes = (int32*)b2Alloc(m_nodeCount * sizeof(int32));
++	int32* nodes = (int32*)b2Alloc(m_userdata, m_nodeCount * sizeof(int32));
+ 	int32 count = 0;
+ 
+ 	// Build array of leaves. Free the rest.
+@@ -785,7 +786,7 @@ void b2DynamicTree::RebuildBottomUp()
+ 	}
+ 
+ 	m_root = nodes[0];
+-	b2Free(nodes);
++	b2Free(m_userdata, nodes);
+ 
+ 	Validate();
+ }
+diff --git a/src/common/b2_block_allocator.cpp b/src/common/b2_block_allocator.cpp
+index 595f2ad..f6fffd0 100644
+--- a/src/common/b2_block_allocator.cpp
++++ b/src/common/b2_block_allocator.cpp
+@@ -86,13 +86,14 @@ struct b2Block
+ 	b2Block* next;
+ };
+ 
+-b2BlockAllocator::b2BlockAllocator()
++b2BlockAllocator::b2BlockAllocator(void* userdata)
+ {
+ 	b2Assert(b2_blockSizeCount < UCHAR_MAX);
+ 
++	m_userdata = userdata;
+ 	m_chunkSpace = b2_chunkArrayIncrement;
+ 	m_chunkCount = 0;
+-	m_chunks = (b2Chunk*)b2Alloc(m_chunkSpace * sizeof(b2Chunk));
++	m_chunks = (b2Chunk*)b2Alloc(m_userdata, m_chunkSpace * sizeof(b2Chunk));
+ 	
+ 	memset(m_chunks, 0, m_chunkSpace * sizeof(b2Chunk));
+ 	memset(m_freeLists, 0, sizeof(m_freeLists));
+@@ -102,10 +103,10 @@ b2BlockAllocator::~b2BlockAllocator()
+ {
+ 	for (int32 i = 0; i < m_chunkCount; ++i)
+ 	{
+-		b2Free(m_chunks[i].blocks);
++		b2Free(m_userdata, m_chunks[i].blocks);
+ 	}
+ 
+-	b2Free(m_chunks);
++	b2Free(m_userdata, m_chunks);
+ }
+ 
+ void* b2BlockAllocator::Allocate(int32 size)
+@@ -119,7 +120,7 @@ void* b2BlockAllocator::Allocate(int32 size)
+ 
+ 	if (size > b2_maxBlockSize)
+ 	{
+-		return b2Alloc(size);
++		return b2Alloc(m_userdata, size);
+ 	}
+ 
+ 	int32 index = b2_sizeMap.values[size];
+@@ -137,14 +138,14 @@ void* b2BlockAllocator::Allocate(int32 size)
+ 		{
+ 			b2Chunk* oldChunks = m_chunks;
+ 			m_chunkSpace += b2_chunkArrayIncrement;
+-			m_chunks = (b2Chunk*)b2Alloc(m_chunkSpace * sizeof(b2Chunk));
++			m_chunks = (b2Chunk*)b2Alloc(m_userdata, m_chunkSpace * sizeof(b2Chunk));
+ 			memcpy(m_chunks, oldChunks, m_chunkCount * sizeof(b2Chunk));
+ 			memset(m_chunks + m_chunkCount, 0, b2_chunkArrayIncrement * sizeof(b2Chunk));
+-			b2Free(oldChunks);
++			b2Free(m_userdata, oldChunks);
+ 		}
+ 
+ 		b2Chunk* chunk = m_chunks + m_chunkCount;
+-		chunk->blocks = (b2Block*)b2Alloc(b2_chunkSize);
++		chunk->blocks = (b2Block*)b2Alloc(m_userdata, b2_chunkSize);
+ #if defined(_DEBUG)
+ 		memset(chunk->blocks, 0xcd, b2_chunkSize);
+ #endif
+@@ -179,7 +180,7 @@ void b2BlockAllocator::Free(void* p, int32 size)
+ 
+ 	if (size > b2_maxBlockSize)
+ 	{
+-		b2Free(p);
++		b2Free(m_userdata, p);
+ 		return;
+ 	}
+ 
+@@ -221,7 +222,7 @@ void b2BlockAllocator::Clear()
+ {
+ 	for (int32 i = 0; i < m_chunkCount; ++i)
+ 	{
+-		b2Free(m_chunks[i].blocks);
++		b2Free(m_userdata, m_chunks[i].blocks);
+ 	}
+ 
+ 	m_chunkCount = 0;
+diff --git a/src/common/b2_stack_allocator.cpp b/src/common/b2_stack_allocator.cpp
+index 602db1a..c0ace8b 100644
+--- a/src/common/b2_stack_allocator.cpp
++++ b/src/common/b2_stack_allocator.cpp
+@@ -23,8 +23,9 @@
+ #include "box2d/b2_stack_allocator.h"
+ #include "box2d/b2_math.h"
+ 
+-b2StackAllocator::b2StackAllocator()
++b2StackAllocator::b2StackAllocator(void* alloc_userdata)
+ {
++	m_userdata = alloc_userdata;
+ 	m_index = 0;
+ 	m_allocation = 0;
+ 	m_maxAllocation = 0;
+@@ -45,7 +46,7 @@ void* b2StackAllocator::Allocate(int32 size)
+ 	entry->size = size;
+ 	if (m_index + size > b2_stackSize)
+ 	{
+-		entry->data = (char*)b2Alloc(size);
++		entry->data = (char*)b2Alloc(m_userdata, size);
+ 		entry->usedMalloc = true;
+ 	}
+ 	else
+@@ -69,7 +70,7 @@ void b2StackAllocator::Free(void* p)
+ 	b2Assert(p == entry->data);
+ 	if (entry->usedMalloc)
+ 	{
+-		b2Free(p);
++		b2Free(m_userdata, p);
+ 	}
+ 	else
+ 	{
+diff --git a/src/dynamics/b2_contact_manager.cpp b/src/dynamics/b2_contact_manager.cpp
+index 5666608..376eb72 100644
+--- a/src/dynamics/b2_contact_manager.cpp
++++ b/src/dynamics/b2_contact_manager.cpp
+@@ -29,7 +29,8 @@
+ b2ContactFilter b2_defaultFilter;
+ b2ContactListener b2_defaultListener;
+ 
+-b2ContactManager::b2ContactManager()
++b2ContactManager::b2ContactManager(void* alloc_userdata)
++	: m_broadPhase{ alloc_userdata }
+ {
+ 	m_contactList = nullptr;
+ 	m_contactCount = 0;
+diff --git a/src/dynamics/b2_world.cpp b/src/dynamics/b2_world.cpp
+index 1a0f791..105c88d 100644
+--- a/src/dynamics/b2_world.cpp
++++ b/src/dynamics/b2_world.cpp
+@@ -40,7 +40,10 @@
+ 
+ #include <new>
+ 
+-b2World::b2World(const b2Vec2& gravity)
++b2World::b2World(const b2Vec2& gravity, void* alloc_userdata)
++	: m_blockAllocator{ alloc_userdata }
++	, m_stackAllocator{ alloc_userdata }
++	, m_contactManager{ alloc_userdata }
+ {
+ 	m_destructionListener = nullptr;
+ 	m_debugDraw = nullptr;
+diff --git a/src/rope/b2_rope.cpp b/src/rope/b2_rope.cpp
+index d2425a2..58c0c79 100644
+--- a/src/rope/b2_rope.cpp
++++ b/src/rope/b2_rope.cpp
+@@ -47,8 +47,9 @@ struct b2RopeBend
+ 	float damper;
+ };
+ 
+-b2Rope::b2Rope()
++b2Rope::b2Rope(void* alloc_userdata)
+ {
++	m_userdata = alloc_userdata;
+ 	m_position.SetZero();
+ 	m_count = 0;
+ 	m_stretchCount = 0;
+@@ -65,13 +66,13 @@ b2Rope::b2Rope()
+ 
+ b2Rope::~b2Rope()
+ {
+-	b2Free(m_stretchConstraints);
+-	b2Free(m_bendConstraints);
+-	b2Free(m_bindPositions);
+-	b2Free(m_ps);
+-	b2Free(m_p0s);
+-	b2Free(m_vs);
+-	b2Free(m_invMasses);
++	b2Free(m_userdata, m_stretchConstraints);
++	b2Free(m_userdata, m_bendConstraints);
++	b2Free(m_userdata, m_bindPositions);
++	b2Free(m_userdata, m_ps);
++	b2Free(m_userdata, m_p0s);
++	b2Free(m_userdata, m_vs);
++	b2Free(m_userdata, m_invMasses);
+ }
+ 
+ void b2Rope::Create(const b2RopeDef& def)
+@@ -79,11 +80,11 @@ void b2Rope::Create(const b2RopeDef& def)
+ 	b2Assert(def.count >= 3);
+ 	m_position = def.position;
+ 	m_count = def.count;
+-	m_bindPositions = (b2Vec2*)b2Alloc(m_count * sizeof(b2Vec2));
+-	m_ps = (b2Vec2*)b2Alloc(m_count * sizeof(b2Vec2));
+-	m_p0s = (b2Vec2*)b2Alloc(m_count * sizeof(b2Vec2));
+-	m_vs = (b2Vec2*)b2Alloc(m_count * sizeof(b2Vec2));
+-	m_invMasses = (float*)b2Alloc(m_count * sizeof(float));
++	m_bindPositions = (b2Vec2*)b2Alloc(m_userdata, m_count * sizeof(b2Vec2));
++	m_ps = (b2Vec2*)b2Alloc(m_userdata, m_count * sizeof(b2Vec2));
++	m_p0s = (b2Vec2*)b2Alloc(m_userdata, m_count * sizeof(b2Vec2));
++	m_vs = (b2Vec2*)b2Alloc(m_userdata, m_count * sizeof(b2Vec2));
++	m_invMasses = (float*)b2Alloc(m_userdata, m_count * sizeof(float));
+ 
+ 	for (int32 i = 0; i < m_count; ++i)
+ 	{
+@@ -106,8 +107,8 @@ void b2Rope::Create(const b2RopeDef& def)
+ 	m_stretchCount = m_count - 1;
+ 	m_bendCount = m_count - 2;
+ 
+-	m_stretchConstraints = (b2RopeStretch*)b2Alloc(m_stretchCount * sizeof(b2RopeStretch));
+-	m_bendConstraints = (b2RopeBend*)b2Alloc(m_bendCount * sizeof(b2RopeBend));
++	m_stretchConstraints = (b2RopeStretch*)b2Alloc(m_userdata, m_stretchCount * sizeof(b2RopeStretch));
++	m_bendConstraints = (b2RopeBend*)b2Alloc(m_userdata, m_bendCount * sizeof(b2RopeBend));
+ 
+ 	for (int32 i = 0; i < m_stretchCount; ++i)
+ 	{
+diff --git a/testbed/tests/chain_problem.cpp b/testbed/tests/chain_problem.cpp
+index 4b2ab38..acad17b 100644
+--- a/testbed/tests/chain_problem.cpp
++++ b/testbed/tests/chain_problem.cpp
+@@ -31,8 +31,8 @@ public:
+         {
+             b2Vec2 g(0.0f, -10.0f);
+             m_world->SetGravity(g);
+-            b2Body** bodies = (b2Body**)b2Alloc(2 * sizeof(b2Body*));
+-            b2Joint** joints = (b2Joint**)b2Alloc(0 * sizeof(b2Joint*));
++            b2Body** bodies = (b2Body**)b2Alloc(nullptr, 2 * sizeof(b2Body*));
++            b2Joint** joints = (b2Joint**)b2Alloc(nullptr, 0 * sizeof(b2Joint*));
+             {
+                 b2BodyDef bd;
+                 bd.type = b2BodyType(0);
+@@ -77,8 +77,8 @@ public:
+                     bodies[1]->CreateFixture(&fd);
+                 }
+             }
+-            b2Free(joints);
+-            b2Free(bodies);
++            b2Free(nullptr, joints);
++            b2Free(nullptr, bodies);
+             joints = NULL;
+             bodies = NULL;
+         }
+diff --git a/testbed/tests/character_collision.cpp b/testbed/tests/character_collision.cpp
+index 3eab4a7..e566bbc 100644
+--- a/testbed/tests/character_collision.cpp
++++ b/testbed/tests/character_collision.cpp
+@@ -67,7 +67,7 @@ public:
+ 			vs[1].Set(6.0f, 8.0f);
+ 			vs[2].Set(7.0f, 8.0f);
+ 			vs[3].Set(8.0f, 7.0f);
+-			b2ChainShape shape;
++			b2ChainShape shape{ nullptr };
+ 			shape.CreateLoop(vs, 4);
+ 			ground->CreateFixture(&shape, 0.0f);
+ 		}
+@@ -98,7 +98,7 @@ public:
+ 			vs[1].Set(1.0f, 3.0f);
+ 			vs[2].Set(1.0f, 5.0f);
+ 			vs[3].Set(-1.0f, 5.0f);
+-			b2ChainShape shape;
++			b2ChainShape shape{ nullptr };
+ 			shape.CreateLoop(vs, 4);
+ 			ground->CreateFixture(&shape, 0.0f);
+ 		}
+@@ -120,7 +120,7 @@ public:
+ 			vs[7].Set(-4.0f, 3.0f);
+ 			vs[8].Set(-6.0f, 2.0f);
+ 			vs[9].Set(-6.0f, 0.0f);
+-			b2ChainShape shape;
++			b2ChainShape shape{ nullptr };
+ 			shape.CreateLoop(vs, 10);
+ 			ground->CreateFixture(&shape, 0.0f);
+ 		}
+diff --git a/testbed/tests/dump_loader.cpp b/testbed/tests/dump_loader.cpp
+index 882f59b..15dd3b7 100644
+--- a/testbed/tests/dump_loader.cpp
++++ b/testbed/tests/dump_loader.cpp
+@@ -29,7 +29,7 @@ public:
+ 
+ 	DumpLoader()
+ 	{
+-		b2ChainShape chainShape;
++		b2ChainShape chainShape{ nullptr };
+ 		b2Vec2 vertices[] = {b2Vec2(-5,0), b2Vec2(5,0), b2Vec2(5,5), b2Vec2(4,1), b2Vec2(-4,1), b2Vec2(-5,5)};
+ 		chainShape.CreateLoop(vertices, 6);
+ 
+diff --git a/testbed/tests/dynamic_tree.cpp b/testbed/tests/dynamic_tree.cpp
+index 7772d5c..4071db2 100644
+--- a/testbed/tests/dynamic_tree.cpp
++++ b/testbed/tests/dynamic_tree.cpp
+@@ -347,7 +347,7 @@ private:
+ 	float m_worldExtent;
+ 	float m_proxyExtent;
+ 
+-	b2DynamicTree m_tree;
++	b2DynamicTree m_tree{ nullptr };
+ 	b2AABB m_queryAABB;
+ 	b2RayCastInput m_rayCastInput;
+ 	b2RayCastOutput m_rayCastOutput;
+diff --git a/testbed/tests/pinball.cpp b/testbed/tests/pinball.cpp
+index 9a9826d..6f617f5 100644
+--- a/testbed/tests/pinball.cpp
++++ b/testbed/tests/pinball.cpp
+@@ -42,7 +42,7 @@ public:
+ 			vs[3].Set(8.0f, 6.0f);
+ 			vs[4].Set(0.0f, -2.0f);
+ 
+-			b2ChainShape loop;
++			b2ChainShape loop{ nullptr };
+ 			loop.CreateLoop(vs, 5);
+ 			b2FixtureDef fd;
+ 			fd.shape = &loop;
+diff --git a/testbed/tests/rope.cpp b/testbed/tests/rope.cpp
+index e4bf5d2..5a20583 100644
+--- a/testbed/tests/rope.cpp
++++ b/testbed/tests/rope.cpp
+@@ -272,8 +272,8 @@ public:
+ 		return new Rope;
+ 	}
+ 
+-	b2Rope m_rope1;
+-	b2Rope m_rope2;
++	b2Rope m_rope1{ nullptr };
++	b2Rope m_rope2{ nullptr };
+ 	b2RopeTuning m_tuning1;
+ 	b2RopeTuning m_tuning2;
+ 	int32 m_iterations1;
+diff --git a/testbed/tests/skier.cpp b/testbed/tests/skier.cpp
+index 8604363..35e68e9 100644
+--- a/testbed/tests/skier.cpp
++++ b/testbed/tests/skier.cpp
+@@ -52,7 +52,7 @@ public:
+ 
+ 			b2Vec2 vertices[5] = { v5, v4, v3, v2, v1 };
+ 
+-			b2ChainShape shape;
++			b2ChainShape shape{ nullptr };
+ 			shape.CreateLoop(vertices, 5);
+ 			b2FixtureDef fd;
+ 			fd.shape = &shape;

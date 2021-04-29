@@ -1,0 +1,12 @@
+sources:
+  "2.4.1":
+    url: "https://github.com/erincatto/box2d.git"
+    tag: "v2.4.1"
+  "2.4.1-alloc":
+    url: "https://github.com/erincatto/box2d.git"
+    branch: master
+    commit: "95f74a46c077825478f989df6a81003ca538c2c2"
+patches:
+  "2.4.1-alloc":
+    - patch_file: patches/initial-alloc.patch
+      patch_description: Extends box2d custom allocator support by allowing to pass a userdata value.
