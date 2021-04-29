@@ -1,10 +1,13 @@
-name: Validate
+name: Deploy
 
-on: 'push'
+on:
+  push:
+    tags:
+    - v*
 
 jobs:
-  validation-build-ubuntu:
-    name: Validate (Ubuntu)
+  deploy-build-ubuntu:
+    name: Deploy (Ubuntu)
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -17,12 +20,17 @@ jobs:
       run: |
         ~/.local/bin/conan create . box2d/2.4.1@iceshard/stable --profile clang-9.0-linux-x86_64
         ~/.local/bin/conan create . box2d/2.4.1@iceshard/stable --profile clang-9.0-linux-x86_64 -o"custom_allocator_extension=True"
-    - name: Success
+    - name: Create (Clang-10)
       run: |
-        echo 'Validation success'
+        ~/.local/bin/conan create . box2d/2.4.1@iceshard/stable --profile clang-10.0-linux-x86_64
+        ~/.local/bin/conan create . box2d/2.4.1@iceshard/stable --profile clang-10.0-linux-x86_64 -o"custom_allocator_extension=True"
+    - name: Deploy
+      run: |
+        ~/.local/bin/conan user iceshard -r conan-iceshard -p ${{ secrets.CONAN_PASSWORD }}
+        ~/.local/bin/conan upload -r box2d/2.4.1@iceshard/stable --all
 
-  validation-build-windows:
-    name: Validate (Windows)
+  deploy-build-windows:
+    name: Deploy (Windows)
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v2
@@ -35,6 +43,7 @@ jobs:
       run: |
         conan create . box2d/2.4.1@iceshard/stable
         conan create . box2d/2.4.1@iceshard/stable -o"custom_allocator_extension=True"
-    - name: Success
+    - name: Deploy
       run: |
-        echo 'Validation success'
+        conan user iceshard -r conan-iceshard -p ${{ secrets.CONAN_PASSWORD }}
+        conan upload -r conan-iceshard box2d/2.4.1@iceshard/stable --all
