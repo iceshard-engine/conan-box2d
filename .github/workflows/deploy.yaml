@@ -16,10 +16,6 @@ jobs:
         pip3 install setuptools
         pip3 install conan
         ~/.local/bin/conan config install https://github.com/iceshard-engine/conan-config.git
-    - name: Create (Clang-9)
-      run: |
-        ~/.local/bin/conan create . box2d/2.4.1@iceshard/stable --profile clang-9.0-linux-x86_64
-        ~/.local/bin/conan create . box2d/2.4.1@iceshard/stable --profile clang-9.0-linux-x86_64 -o"custom_allocator_extension=True"
     - name: Create (Clang-10)
       run: |
         ~/.local/bin/conan create . box2d/2.4.1@iceshard/stable --profile clang-10.0-linux-x86_64
