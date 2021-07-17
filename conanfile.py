@@ -19,7 +19,7 @@ class Box2dConan(ConanFile):
     exports_sources = ["patches/*"]
 
     # Iceshard conan tools
-    python_requires = "conan-iceshard-tools/0.6.2@iceshard/stable"
+    python_requires = "conan-iceshard-tools/0.6.4@iceshard/stable"
     python_requires_extend = "conan-iceshard-tools.IceTools"
 
     def init(self):
@@ -36,13 +36,15 @@ class Box2dConan(ConanFile):
 
     # Build both the debug and release builds
     def ice_build(self):
-        # Apply patches if existing
-        patch_info = self.conan_data["patches"].get(self.ice_source_entry(self.version))
-        if patch_info != None:
-            for patch in patch_info:
-                tools.patch(patch_file="../{}".format(patch["patch_file"]))
+        self.ice_apply_patches()
 
-        self.ice_build_cmake(["Debug", "Release"])
+        definitions = { }
+        definitions['BOX2D_BUILD_DOCS'] = False
+        definitions['BOX2D_BUILD_TESTBED'] = False
+        definitions['BOX2D_BUILD_UNIT_TESTS'] = False
+        definitions['BOX2D_USER_SETTINGS'] = False
+
+        self.ice_build_cmake(["Debug", "Release"], definitions)
 
     def package(self):
         self.copy("LICENSE", src=self._ice.out_dir, dst="LICENSE")
@@ -50,11 +52,13 @@ class Box2dConan(ConanFile):
         self.copy("*.h", "include/", src="{}/include".format(self._ice.out_dir), keep_path=True)
 
         for config in ["Debug", "Release"]:
-            build_dir = os.path.join(self._ice.out_dir, "build/bin/{}".format(config))
+            build_dir = os.path.join(self._ice.out_dir, "../build_{}/".format(config))
+
             if self.settings.os == "Windows":
-                self.copy("box2d.lib", "lib/{}".format(config), build_dir, keep_path=True)
+                self.copy("*.lib", dst="lib/{}".format(config), src="{}/bin".format(build_dir), keep_path=False)
+                self.copy("*.pdb", dst="lib/{}".format(config), src="{}/bin".format(build_dir), keep_path=False)
             if self.settings.os == "Linux":
-                self.copy("box2d.a", "lib/{}".format(config), build_dir, keep_path=True)
+                self.copy("*.a", dst="lib/{}".format(config), src="{}/bin".format(build_dir), keep_path=False)
 
     def package_info(self):
         self.cpp_info.libdirs = []
