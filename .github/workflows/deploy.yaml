@@ -23,7 +23,7 @@ jobs:
     - name: Deploy
       run: |
         ~/.local/bin/conan user iceshard -r conan-iceshard -p ${{ secrets.CONAN_PASSWORD }}
-        ~/.local/bin/conan upload -r box2d/2.4.1@iceshard/stable --all
+        ~/.local/bin/conan upload -r conan-iceshard box2d/2.4.1@iceshard/stable --all
 
   deploy-build-windows:
     name: Deploy (Windows)
