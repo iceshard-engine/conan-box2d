@@ -48,7 +48,7 @@ class Box2dConan(ConanFile):
         self.ice_apply_patches()
 
         definitions = { }
-        if self.settings.compiler == 'Visual Studio':
+        if self.settings.compiler != 'Visual Studio':
             definitions['CMAKE_POSITION_INDEPENDENT_CODE'] = self.options.fPIC
         definitions['BOX2D_BUILD_DOCS'] = False
         definitions['BOX2D_BUILD_TESTBED'] = False
