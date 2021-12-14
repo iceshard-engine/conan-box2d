@@ -25,7 +25,7 @@ class Box2dConan(ConanFile):
     exports_sources = ["patches/*"]
 
     # Iceshard conan tools
-    python_requires = "conan-iceshard-tools/0.7.0@iceshard/stable"
+    python_requires = "conan-iceshard-tools/0.7.1@iceshard/stable"
     python_requires_extend = "conan-iceshard-tools.IceTools"
 
     def init(self):
