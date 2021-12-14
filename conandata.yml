@@ -6,7 +6,16 @@ sources:
     url: "https://github.com/erincatto/box2d.git"
     branch: master
     commit: "95f74a46c077825478f989df6a81003ca538c2c2"
+  "2.4.1-usersym":
+    url: "https://github.com/erincatto/box2d.git"
+    branch: master
+    commit: "95f74a46c077825478f989df6a81003ca538c2c2"
 patches:
   "2.4.1-alloc":
     - patch_file: patches/initial-alloc.patch
       patch_description: Extends box2d custom allocator support by allowing to pass a userdata value.
+  "2.4.1-usersym":
+    - patch_file: patches/initial-alloc.patch
+      patch_description: Extends box2d custom allocator support by allowing to pass a userdata value.
+    - patch_file: patches/force-undefined-symbols.patch
+      patch_description: Some of the user customizable functions are only declared, and the symbols need to be provided by the user during linking.

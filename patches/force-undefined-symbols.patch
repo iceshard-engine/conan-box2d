@@ -1,0 +1,72 @@
+diff --git a/include/box2d/b2_settings.h b/include/box2d/b2_settings.h
+index 854d618..f94fe3a 100644
+--- a/include/box2d/b2_settings.h
++++ b/include/box2d/b2_settings.h
+@@ -31,7 +31,66 @@
+ ///
+ 
+ /// Define this macro in your build if you want to override settings
+-#ifdef B2_USER_SETTINGS
++#if defined(B2_USER_SYMBOLS)
++
++// Tunable Constants
++
++/// You can use this to change the length scale used by your game.
++/// For example for inches you could use 39.4.
++#define b2_lengthUnitsPerMeter 1.0f
++
++/// The maximum number of vertices on a convex polygon. You cannot increase
++/// this too much because b2BlockAllocator has a maximum object size.
++#define b2_maxPolygonVertices	8
++
++// User data
++
++/// You can define this to inject whatever data you want in b2Body
++struct B2_API b2BodyUserData
++{
++	b2BodyUserData()
++	{
++		pointer = 0;
++	}
++
++	/// For legacy compatibility
++	uintptr_t pointer;
++};
++
++/// You can define this to inject whatever data you want in b2Fixture
++struct B2_API b2FixtureUserData
++{
++	b2FixtureUserData()
++	{
++		pointer = 0;
++	}
++
++	/// For legacy compatibility
++	uintptr_t pointer;
++};
++
++/// You can define this to inject whatever data you want in b2Joint
++struct B2_API b2JointUserData
++{
++	b2JointUserData()
++	{
++		pointer = 0;
++	}
++
++	/// For legacy compatibility
++	uintptr_t pointer;
++};
++
++/// Implement this function to use your own memory allocator.
++void* b2Alloc(void*, int32 size);
++
++/// If you implement b2Alloc, you should also implement this function.
++void b2Free(void*, void* mem);
++
++/// Implement this to use your own logging.
++void b2Log(const char* string, ...);
++
++#elif defined(B2_USER_SETTINGS)
+ 
+ /// This is a user file that includes custom definitions of the macros, structs, and functions
+ /// defined below.

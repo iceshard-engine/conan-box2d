@@ -10,9 +10,15 @@ class Box2dConan(ConanFile):
 
     # Setting and options
     settings = "os", "compiler", "arch", "build_type"
-    options = { "custom_allocator_extension":[True, False] }
+    options = {
+        "fPIC":[True, False],
+        "custom_allocator_extension":[True, False],
+        "undefined_user_symbols": [True, False]
+    }
     default_options = {
-        "custom_allocator_extension": False
+        "fPIC":True,
+        "custom_allocator_extension": False,
+        "undefined_user_symbols": False
     }
 
     # Additional files to export
@@ -29,17 +35,26 @@ class Box2dConan(ConanFile):
     def ice_source_key(self, version):
         if self.options.custom_allocator_extension == True:
             return "{}-alloc".format(version)
+        elif self.options.undefined_user_symbols == True:
+            return "{}-usersym".format(version)
         else:
             return version
+
+    def configure(self):
+        if self.settings.compiler == 'Visual Studio':
+            del self.options.fPIC
 
     def ice_build(self):
         self.ice_apply_patches()
 
         definitions = { }
+        if self.settings.compiler == 'Visual Studio':
+            definitions['CMAKE_POSITION_INDEPENDENT_CODE'] = self.options.fPIC
         definitions['BOX2D_BUILD_DOCS'] = False
         definitions['BOX2D_BUILD_TESTBED'] = False
         definitions['BOX2D_BUILD_UNIT_TESTS'] = False
         definitions['BOX2D_USER_SETTINGS'] = False
+        definitions['B2_USER_SYMBOLS'] = True
 
         self.ice_run_cmake(definitions)
 
@@ -56,5 +71,8 @@ class Box2dConan(ConanFile):
             self.copy("*.a", dst="lib", src="{}/bin".format(build_dir), keep_path=False)
 
     def package_info(self):
-        self.cpp_info.libdirs = [ "lib" ]
+        self.cpp_info.libdirs = ["lib"]
         self.cpp_info.libs = ["box2d"]
+
+        if self.options.undefined_user_symbols == True:
+            self.cpp_info.defines = ["B2_USER_SYMBOLS"]
