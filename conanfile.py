@@ -43,9 +43,6 @@ class Box2dConan(ConanFile):
     def configure(self):
         if self.settings.compiler == 'Visual Studio':
             del self.options.fPIC
-        
-        if self.settings.compiler != 'Visual Studio':
-            self.options['cmake'].with_openssl = False
 
     def ice_build(self):
         self.ice_apply_patches()
