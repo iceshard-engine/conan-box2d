@@ -4,11 +4,11 @@ sources:
     tag: "v2.4.1"
   "2.4.1-alloc":
     url: "https://github.com/erincatto/box2d.git"
-    branch: master
+    branch: main
     commit: "95f74a46c077825478f989df6a81003ca538c2c2"
   "2.4.1-usersym":
     url: "https://github.com/erincatto/box2d.git"
-    branch: master
+    branch: main
     commit: "95f74a46c077825478f989df6a81003ca538c2c2"
 patches:
   "2.4.1-alloc":
